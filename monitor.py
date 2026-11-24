@@ -14,14 +14,16 @@ ORIGIN_NAMES = {"SAO": "São Paulo", "VCP": "Campinas (VCP)"}
 def main():
     db = store.connect()
     rows, failures = [], []
+    seen_at = store.now_iso()
     for name, fetch in (("voos", flights.fetch), ("ônibus", lambda: bus.fetch(db))):
         try:
-            rows += fetch()
+            got = fetch()
+            store.add_obs(db, got, seen_at)   # grava já, pra não perder se a próxima fonte travar
+            rows += got
         except Exception as e:  # noqa: BLE001
             failures.append(f"{name}: {e}")
             print(f"[erro] {name}: {e}")
 
-    seen_at = store.add_obs(db, rows) if rows else None
     deals, total = detector.find_deals(db, rows, seen_at) if rows else ([], 0)
     print(f"[monitor] {len(rows)} preços, {total} pechinchas, enviando {len(deals)}")
 

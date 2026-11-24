@@ -80,6 +80,7 @@ BUS_DAYS_AHEAD = 60                 # datas de partida consideradas
 BUS_EVERY_N_RUNS = {1: 15, 2: 45}   # cada data é revisitada a cada N execuções (rodízio)
 BUS_MAX_PAGES_PER_RUN = 220         # teto de buscas por execução
 BUS_PAUSE_SECONDS = 1.0             # pausa entre buscas (gentileza com o site)
+BUS_TIME_BUDGET_SECONDS = 20 * 60   # tempo máximo de coleta de ônibus por execução
 
 # ---------------------------------------------------------------- DETECTOR
 # A ideia: só avisar quando o preço estiver no menor nível já visto para aquela rota,
