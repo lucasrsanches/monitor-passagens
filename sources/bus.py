@@ -86,25 +86,37 @@ def fetch(db=None):
 
     run_no = int(store.kv_get(db, "bus_run", 0)) if db else 0
     jobs = _plan(run_no)[: config.BUS_MAX_PAGES_PER_RUN]
-    rows, fails, t0 = [], 0, time.time()
+    rows, fails, done, t0 = [], 0, 0, time.time()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(locale="pt-BR")
         page.route("**/*", lambda r: r.abort() if BLOCK.search(r.request.url) else r.continue_())
         for o_slug, d_slug, dest, dep in jobs:
+            if time.time() - t0 > config.BUS_TIME_BUDGET_SECONDS:
+                print(f"[ônibus] tempo esgotado depois de {done} buscas")
+                break
+            if done >= 6 and fails == done:
+                print("[ônibus] as 6 primeiras buscas falharam — desistindo nesta rodada")
+                break
             url = SEARCH.format(o=o_slug, d=d_slug, dt=dep)
+            done += 1
+            s0 = time.time()
             try:
-                with page.expect_response(lambda r: "/api/v6/trips" in r.url, timeout=35000) as info:
+                with page.expect_response(lambda r: "/api/v6/trips" in r.url, timeout=25000) as info:
                     page.goto(url, wait_until="domcontentloaded")
-                rows += _rows_from(info.value.json(), dest, dep, url)
+                status = info.value.status
+                got = _rows_from(info.value.json(), dest, dep, url)
+                rows += got
+                if done <= 3:
+                    print(f"[ônibus] {o_slug}->{d_slug} {dep}: HTTP {status}, {len(got)} preços, {time.time() - s0:.1f}s")
             except Exception as e:  # noqa: BLE001
                 fails += 1
-                print(f"[ônibus] falhou {o_slug}->{d_slug} {dep}: {str(e)[:80]}")
+                print(f"[ônibus] falhou {o_slug}->{d_slug} {dep} ({time.time() - s0:.0f}s): {str(e)[:80]}")
             time.sleep(config.BUS_PAUSE_SECONDS)
         browser.close()
     if db:
         store.kv_set(db, "bus_run", run_no + 1)
-    print(f"[ônibus] {len(jobs)} buscas, {fails} falhas, {len(rows)} preços em {time.time() - t0:.0f}s")
-    if jobs and fails > len(jobs) * 0.5 and not rows:
-        raise RuntimeError(f"ClickBus: {fails}/{len(jobs)} buscas falharam (bloqueio ou mudança no site?)")
+    print(f"[ônibus] {done} buscas, {fails} falhas, {len(rows)} preços em {time.time() - t0:.0f}s")
+    if done and fails > done * 0.5 and not rows:
+        raise RuntimeError(f"ClickBus: {fails}/{done} buscas falharam (bloqueio ou mudança no site?)")
     return rows
