@@ -77,10 +77,10 @@ BUS_ROUTES = [(o, d, _DEST[d], prio) for prio, table in ((1, _PRIO1), (2, _PRIO2
 
 BUS_MAX_HOURS = {"*": 14, "Porto Alegre": 22}   # viagem mais longa aceita
 BUS_DAYS_AHEAD = 60                 # datas de partida consideradas
-BUS_EVERY_N_RUNS = {1: 15, 2: 45}   # cada data é revisitada a cada N execuções (rodízio)
-BUS_MAX_PAGES_PER_RUN = 220         # teto de buscas por execução
-BUS_PAUSE_SECONDS = 1.0             # pausa entre buscas (gentileza com o site)
-BUS_TIME_BUDGET_SECONDS = 20 * 60   # tempo máximo de coleta de ônibus por execução
+BUS_EVERY_N_RUNS = {1: 30, 2: 60}   # cada data é revisitada a cada N execuções (rodízio)
+BUS_MAX_PAGES_PER_RUN = 100         # teto de buscas por execução
+BUS_PAUSE_SECONDS = 10.0            # pausa entre buscas — a ClickBus limita (HTTP 429) se for rápido
+BUS_TIME_BUDGET_SECONDS = 22 * 60   # tempo máximo de coleta de ônibus por execução
 
 # ---------------------------------------------------------------- DETECTOR
 # A ideia: só avisar quando o preço estiver no menor nível já visto para aquela rota,
