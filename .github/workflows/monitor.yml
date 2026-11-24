@@ -26,6 +26,7 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - name: Coletar e alertar
         env:
+          PYTHONUNBUFFERED: "1"
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: python monitor.py
