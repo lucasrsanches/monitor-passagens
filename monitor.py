@@ -6,7 +6,7 @@ import config
 import detector
 import store
 import telegram
-from sources import bus, flights
+from sources import bus, buser, flights
 
 ORIGIN_NAMES = {"SAO": "São Paulo", "VCP": "Campinas (VCP)"}
 
@@ -15,7 +15,8 @@ def main():
     db = store.connect()
     rows, failures = [], []
     seen_at = store.now_iso()
-    for name, fetch in (("voos", flights.fetch), ("ônibus", lambda: bus.fetch(db))):
+    for name, fetch in (("voos", flights.fetch), ("Buser", lambda: buser.fetch(db)),
+                        ("ClickBus", lambda: bus.fetch(db))):
         try:
             got = fetch()
             store.add_obs(db, got, seen_at)   # grava já, pra não perder se a próxima fonte travar

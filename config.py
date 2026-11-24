@@ -75,12 +75,37 @@ _PRIO2 = {  # escolhidos por mim: até ~10h de viagem
 BUS_ROUTES = [(o, d, _DEST[d], prio) for prio, table in ((1, _PRIO1), (2, _PRIO2))
               for d, origins in table.items() for o in origins]
 
-BUS_MAX_HOURS = {"*": 14, "Porto Alegre": 22}   # viagem mais longa aceita
+# ---------------------------------------------------------------- ÔNIBUS (Buser)
+# A Buser agrupa por cidade. Rotas onde ela tem viagens (mapeado em 24/11/2026; sem Peruíbe).
+BUSER_ENABLED = True
+_BSP, _BSA, _BSBC = "sao-paulo-sp", "santo-andre-sp", "sao-bernardo-do-campo-sp"
+_BUSER = {  # destino slug -> (prioridade, origens)
+    "belo-horizonte-mg": (1, [_BSP, _BSA, _BSBC]),
+    "juiz-de-fora-mg": (1, [_BSP]),
+    "pouso-alegre-mg": (1, [_BSP, _BSBC]),
+    "uberlandia-mg": (1, [_BSP]),
+    "florianopolis-sc": (1, [_BSP]),
+    "porto-alegre-rs": (1, [_BSP]),
+    "rio-de-janeiro-rj": (2, [_BSP, _BSA, _BSBC]),
+    "parati-rj": (2, [_BSP]),
+    "curitiba-pr": (2, [_BSP, _BSA, _BSBC]),
+    "joinville-sc": (2, [_BSP, _BSBC]),
+    "balneario-camboriu-sc": (2, [_BSP]),
+    "londrina-pr": (2, [_BSP]),
+    "ribeirao-preto-sp": (2, [_BSP]),
+}
+_BUSER_SLUG = {"parati-rj": "paraty-rj"}   # a Buser escreve Paraty com y
+BUSER_ROUTES = [(o, _BUSER_SLUG.get(d, d), _DEST[d], prio)
+                for d, (prio, origins) in _BUSER.items() for o in origins]
+BUSER_PAUSE_SECONDS = 5.0
+BUSER_TIME_BUDGET_SECONDS = 8 * 60
+
+BUS_MAX_HOURS ={"*": 14, "Porto Alegre": 22}   # viagem mais longa aceita
 BUS_DAYS_AHEAD = 60                 # datas de partida consideradas
 BUS_EVERY_N_RUNS = {1: 30, 2: 60}   # cada data é revisitada a cada N execuções (rodízio)
 BUS_MAX_PAGES_PER_RUN = 100         # teto de buscas por execução
 BUS_PAUSE_SECONDS = 10.0            # pausa entre buscas — a ClickBus limita (HTTP 429) se for rápido
-BUS_TIME_BUDGET_SECONDS = 22 * 60   # tempo máximo de coleta de ônibus por execução
+BUS_TIME_BUDGET_SECONDS = 18 * 60   # tempo máximo de coleta de ônibus por execução
 
 # ---------------------------------------------------------------- DETECTOR
 # A ideia: só avisar quando o preço estiver no menor nível já visto para aquela rota,
