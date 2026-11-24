@@ -86,7 +86,8 @@ def fetch(db=None):
 
     run_no = int(store.kv_get(db, "bus_run", 0)) if db else 0
     jobs = _plan(run_no)[: config.BUS_MAX_PAGES_PER_RUN]
-    rows, fails, done, t0 = [], 0, 0, time.time()
+    rows, fails, done, limited, t0 = [], 0, 0, 0, time.time()
+    pause = config.BUS_PAUSE_SECONDS
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(locale="pt-BR")
@@ -95,24 +96,35 @@ def fetch(db=None):
             if time.time() - t0 > config.BUS_TIME_BUDGET_SECONDS:
                 print(f"[ônibus] tempo esgotado depois de {done} buscas")
                 break
-            if done >= 6 and fails == done:
-                print("[ônibus] as 6 primeiras buscas falharam — desistindo nesta rodada")
-                break
             url = SEARCH.format(o=o_slug, d=d_slug, dt=dep)
             done += 1
-            s0 = time.time()
+            s0, main = time.time(), None
             try:
-                with page.expect_response(lambda r: "/api/v6/trips" in r.url, timeout=25000) as info:
-                    page.goto(url, wait_until="domcontentloaded")
+                with page.expect_response(lambda r: "/api/v6/trips" in r.url, timeout=20000) as info:
+                    main = page.goto(url, wait_until="domcontentloaded")
+                    if main and main.status == 429:
+                        raise RuntimeError("429")
                 status = info.value.status
-                got = _rows_from(info.value.json(), dest, dep, url)
+                if status == 429:
+                    raise RuntimeError("429")
+                got = _rows_from(info.value.json(), dest, dep, url) if status == 200 else []
                 rows += got
-                if done <= 3:
+                if done <= 3 or status != 200:
                     print(f"[ônibus] {o_slug}->{d_slug} {dep}: HTTP {status}, {len(got)} preços, {time.time() - s0:.1f}s")
             except Exception as e:  # noqa: BLE001
                 fails += 1
-                print(f"[ônibus] falhou {o_slug}->{d_slug} {dep} ({time.time() - s0:.0f}s): {str(e)[:80]}")
-            time.sleep(config.BUS_PAUSE_SECONDS)
+                if "429" in str(e) or (main is not None and main.status == 429):
+                    # O site pediu pra ir mais devagar: respeita, espera e diminui o ritmo.
+                    limited += 1
+                    if limited >= 3:
+                        print("[ônibus] site limitou as buscas 3 vezes — parando nesta rodada")
+                        break
+                    pause = min(pause * 2, 60)
+                    print(f"[ônibus] site pediu calma (429) — esperando 90s; nova pausa {pause:.0f}s")
+                    time.sleep(90)
+                else:
+                    print(f"[ônibus] falhou {o_slug}->{d_slug} {dep} ({time.time() - s0:.0f}s): {str(e)[:60]}")
+            time.sleep(pause)
         browser.close()
     if db:
         store.kv_set(db, "bus_run", run_no + 1)
