@@ -24,6 +24,24 @@ def _call(method, **params):
     return r.json().get("result")
 
 
+def diagnose(db):
+    """Mostra no registro se o Telegram está configurado (sem nunca mostrar o token)."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    if not token:
+        print("[telegram] segredo TELEGRAM_BOT_TOKEN não encontrado")
+        return
+    if ":" not in token:
+        print(f"[telegram] o token salvo não tem ':' ({len(token)} caracteres) — parece não ser o do BotFather")
+    try:
+        me = _call("getMe") or {}
+        print(f"[telegram] bot conectado: @{me.get('username')}")
+    except Exception as e:  # noqa: BLE001
+        print(f"[telegram] token recusado pelo Telegram: {str(e)[:80].replace(token, '***')}")
+        return
+    cid = chat_id(db)
+    print(f"[telegram] conversa {'encontrada' if cid else 'NÃO encontrada — mande /start pro bot'}")
+
+
 def chat_id(db):
     cid = os.environ.get("TELEGRAM_CHAT_ID") or store.kv_get(db, "telegram_chat_id")
     if cid:

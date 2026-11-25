@@ -13,6 +13,7 @@ ORIGIN_NAMES = {"SAO": "São Paulo", "VCP": "Campinas (VCP)"}
 
 def main():
     db = store.connect()
+    telegram.diagnose(db)
     rows, failures = [], []
     seen_at = store.now_iso()
     for name, fetch in (("voos", flights.fetch), ("Buser", lambda: buser.fetch(db)),
