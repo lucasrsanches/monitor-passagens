@@ -33,6 +33,23 @@ BR_DESTINATIONS = {
     "BYO": "Bonito", "JTC": "Bauru", "PFB": "Passo Fundo", "UBA": "Uberaba", "GVR": "Governador Valadares",
 }
 
+# Internacionais baratos de visitar (pedido do Lucas em 26/11/2026 + escolhas de custo local baixo).
+# Alguns lugares aparecem com código da cidade E do aeroporto, porque a API usa os dois.
+INTL_DESTINATIONS = {
+    # Argentina
+    "BUE": "Buenos Aires 🇦🇷", "EZE": "Buenos Aires 🇦🇷", "AEP": "Buenos Aires 🇦🇷",
+    "BRC": "Bariloche 🇦🇷", "MDZ": "Mendoza 🇦🇷", "COR": "Córdoba 🇦🇷", "SLA": "Salta 🇦🇷",
+    # Paraguai, Uruguai
+    "ASU": "Assunção 🇵🇾", "MVD": "Montevidéu 🇺🇾", "PDP": "Punta del Este 🇺🇾",
+    # Peru, Chile
+    "LIM": "Lima 🇵🇪", "CUZ": "Cusco 🇵🇪", "SCL": "Santiago 🇨🇱",
+    # Outros com custo local baixo
+    "SRZ": "Santa Cruz de la Sierra 🇧🇴", "VVI": "Santa Cruz de la Sierra 🇧🇴", "LPB": "La Paz 🇧🇴",
+    "BOG": "Bogotá 🇨🇴", "MDE": "Medellín 🇨🇴", "CTG": "Cartagena 🇨🇴",
+    "UIO": "Quito 🇪🇨", "MEX": "Cidade do México 🇲🇽",
+}
+FLIGHT_DESTINATIONS = {**BR_DESTINATIONS, **INTL_DESTINATIONS}
+
 # Quantos meses à frente varrer (o cache da API costuma ter até ~12 meses).
 FLIGHT_MONTHS_AHEAD = 8
 

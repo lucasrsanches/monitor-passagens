@@ -36,7 +36,7 @@ def main():
     print(f"[monitor] {len(rows)} preços, {total} pechinchas, enviando {len(deals)}")
 
     for d in deals:
-        dest_name = config.BR_DESTINATIONS.get(d["dest"], d["dest"])
+        dest_name = config.FLIGHT_DESTINATIONS.get(d["dest"], d["dest"])
         origin_name = ORIGIN_NAMES.get(d["origin"], d["origin"])
         if telegram.send(db, telegram.format_deal(d, dest_name, origin_name)):
             store.save_alert(db, d["key"], d["price"])
