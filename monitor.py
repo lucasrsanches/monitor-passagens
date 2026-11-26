@@ -2,13 +2,14 @@
 import sys
 from datetime import datetime, timezone
 
+import combos
 import config
 import detector
 import store
 import telegram
 from sources import bus, buser, flights
 
-ORIGIN_NAMES = {"SAO": "São Paulo", "VCP": "Campinas (VCP)"}
+ORIGIN_NAMES = {"SAO": "São Paulo (GRU/CGH)"}
 
 
 def main():
@@ -25,6 +26,11 @@ def main():
         except Exception as e:  # noqa: BLE001
             failures.append(f"{name}: {e}")
             print(f"[erro] {name}: {e}")
+
+    trips = combos.build(db)                 # ida + volta de ônibus
+    store.add_obs(db, trips, seen_at)
+    rows += trips
+    print(f"[combos] {len(trips)} combos de ida e volta de ônibus")
 
     deals, total = detector.find_deals(db, rows, seen_at) if rows else ([], 0)
     print(f"[monitor] {len(rows)} preços, {total} pechinchas, enviando {len(deals)}")

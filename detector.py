@@ -17,6 +17,8 @@ def find_deals(db, rows, seen_at):
     # menor preço de cada viagem (modo, origem, destino, data) nesta execução
     best = {}
     for r in rows:
+        if r["mode"] in config.NO_SINGLE_ALERT:
+            continue
         k = (r["mode"], r["origin"], r["dest"], r["dep_date"])
         if k not in best or r["price"] < best[k]["price"]:
             best[k] = r
@@ -39,7 +41,7 @@ def find_deals(db, rows, seen_at):
         if not ((is_record and ratio <= config.MAX_RATIO_VS_MEDIAN) or ratio <= config.EXTREME_RATIO):
             continue
 
-        key = f"{mode}|{origin}|{dest}|{dep}"
+        key = f"{mode}|{origin}|{dest}|{dep}" + (f"|{r['ret_date']}" if r.get("ret_date") else "")
         prev = store.last_alert(db, key)
         if prev:
             prev_price, prev_at = prev

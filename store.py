@@ -37,15 +37,22 @@ def connect(path=DB_PATH):
         CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
         """
     )
+    cols = {c[1] for c in db.execute("PRAGMA table_info(obs)")}
+    for col in ("ret_date", "link2"):          # colunas novas (ida e volta)
+        if col not in cols:
+            db.execute(f"ALTER TABLE obs ADD COLUMN {col} TEXT")
+    db.commit()
     return db
 
 
 def add_obs(db, rows, seen_at=None):
     seen_at = seen_at or now_iso()
     db.executemany(
-        "INSERT INTO obs VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO obs (seen_at, mode, origin, dest, dep_date, dep_time, price, carrier, info, link,"
+        " ret_date, link2) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         [(seen_at, r["mode"], r["origin"], r["dest"], r["dep_date"], r.get("dep_time"),
-          float(r["price"]), r.get("carrier"), r.get("info"), r.get("link")) for r in rows],
+          float(r["price"]), r.get("carrier"), r.get("info"), r.get("link"),
+          r.get("ret_date"), r.get("link2")) for r in rows],
     )
     db.commit()
     return seen_at
@@ -61,6 +68,15 @@ def route_prices(db, mode, origin, dest, days, exclude_seen_at=None):
         q += " AND seen_at<>?"
         args.append(exclude_seen_at)
     return [p for _, p in db.execute(q, args)]
+
+
+def latest_prices(db, mode, hours):
+    """Último preço conhecido de cada (origem, destino, data) visto nas últimas N horas."""
+    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    q = ("SELECT origin, dest, dep_date, price, carrier, info, link, dep_time, MAX(seen_at) "
+         "FROM obs WHERE mode=? AND seen_at>=? GROUP BY origin, dest, dep_date")
+    keys = ("origin", "dest", "dep_date", "price", "carrier", "info", "link", "dep_time")
+    return [dict(zip(keys, r[:8])) for r in db.execute(q, (mode, since))]
 
 
 def last_alert(db, key):

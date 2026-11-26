@@ -73,17 +73,29 @@ def fmt_date(iso):
 
 
 def format_deal(d, dest_name, origin_name):
-    icon = "✈️" if d["mode"] == "aviao" else "🚌"
+    icon = "✈️" if d["mode"].startswith("aviao") else "🚌"
     off = round((1 - d["ratio"]) * 100)
     tag = "🔥 MENOR PREÇO JÁ VISTO" if d["is_record"] else "📉 perto do menor já visto"
     if d["ratio"] <= 0.4:
         tag = "🚨 POSSÍVEL ERRO DE TARIFA"
-    hora = f" {d['dep_time']}" if d.get("dep_time") else ""
-    extra = f"\n{d['carrier']}" + (f" · {d['info']}" if d.get("info") else "") if d.get("carrier") else ""
-    link = f'\n<a href="{d["link"]}">Abrir busca</a>' if d.get("link") else ""
+    details = " · ".join(x for x in (d.get("carrier"), d.get("info")) if x)
+    extra = f"\n{details}" if details else ""
+    if d.get("ret_date"):
+        nights = (date.fromisoformat(d["ret_date"]) - date.fromisoformat(d["dep_date"])).days
+        title = f"{icon}🔁 <b>{origin_name} ⇄ {dest_name}</b> (ida e volta)"
+        when = f"ida {fmt_date(d['dep_date'])} · volta {fmt_date(d['ret_date'])} ({nights} noites)"
+        total = f"<b>{brl(d['price'])} no total</b>"
+    else:
+        title = f"{icon} <b>{origin_name} → {dest_name}</b> (só ida)"
+        when = fmt_date(d["dep_date"]) + (f" {d['dep_time']}" if d.get("dep_time") else "")
+        total = f"<b>{brl(d['price'])}</b>"
+    links = []
+    if d.get("link"):
+        links.append(f'<a href="{d["link"]}">{"Ver ida" if d.get("link2") else "Abrir busca"}</a>')
+    if d.get("link2"):
+        links.append(f'<a href="{d["link2"]}">Ver volta</a>')
     return (
-        f"{icon} <b>{origin_name} → {dest_name}</b>\n"
-        f"{fmt_date(d['dep_date'])}{hora} · <b>{brl(d['price'])}</b> (−{off}% do normal)\n"
+        f"{title}\n{when}\n{total} (−{off}% do normal)\n"
         f"Normal: {brl(d['median'])} · Menor anterior: {brl(d['record'])} · {d['samples']} preços no histórico\n"
-        f"{tag}{extra}{link}"
+        f"{tag}{extra}" + ("\n" + " · ".join(links) if links else "")
     )

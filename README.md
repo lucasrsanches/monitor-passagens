@@ -32,15 +32,26 @@ Além disso:
 4. Na aba *Actions → monitor-passagens → Run workflow*, rode uma vez para testar.
    Toda segunda chega um "✅ Monitor ativo" para você saber que ele está vivo.
 
+## Ida e volta
+
+Além de só ida, o robô monta e compara combos de ida e volta, ficando de 2 a 10 noites
+(`TRIP_MIN_NIGHTS` / `TRIP_MAX_NIGHTS` em `config.py`):
+- **Avião:** tarifas de ida e volta da própria API.
+- **Ônibus:** junta a ida mais barata (de SP ou ABC, por qualquer site) com a volta mais barata.
+  As voltas sozinhas nunca geram alerta.
+
 ## Fontes
 
 - **Avião:** API oficial de dados da Travelpayouts/Aviasales, com preços em cache de buscas
-  reais de São Paulo (SAO) e Campinas (VCP) pra ~60 destinos nacionais, 8 meses à frente.
-  O link do alerta abre o Google Flights na data certa. Confira lá antes de comprar.
-- **Ônibus:** página pública de busca da ClickBus, lida por um navegador automático
-  (`sources/bus.py`). São 63 rotas saindo de Tietê, Barra Funda, Jabaquara, Santo André e
-  São Bernardo, pras próximas 60 datas, em rodízio de ~165 buscas por execução.
-  Prioridade: Peruíbe, Minas, Florianópolis e Porto Alegre. A lista fica em `config.py`.
+  reais saindo só de Guarulhos (GRU) e Congonhas (CGH) pra ~60 destinos nacionais, 8 meses
+  à frente. O link do alerta abre o Google Flights na data certa. Confira lá antes de comprar.
+- **Ônibus — Buser** (`sources/buser.py`): fonte principal. Cada página traz o menor preço de
+  8 dias, por cidade (São Paulo, Santo André, São Bernardo).
+- **Ônibus — ClickBus** (`sources/bus.py`): complemento, devagar (a ClickBus bloqueia buscas
+  rápidas). Saídas de Tietê, Barra Funda, Jabaquara, Santo André e São Bernardo.
+- **Destinos de ônibus:** Peruíbe, Belo Horizonte, Florianópolis e Porto Alegre como
+  prioridade, mais cidades turísticas (litoral de SP e RJ, SC, serra). A lista fica em
+  `config.py`.
 
 ## Rodar no PC (teste)
 
