@@ -37,43 +37,69 @@ def _get(params, token):
     return body.get("data") or []
 
 
+def _row(t, origin, round_trip):
+    """Converte um item da API numa linha do histórico (ou None se não interessa)."""
+    dest = (t.get("destination") or "").upper()
+    airport = (t.get("origin_airport") or "").upper()
+    if dest not in config.BR_DESTINATIONS or not t.get("price"):
+        return None
+    if airport not in config.FLIGHT_AIRPORTS:      # só Guarulhos e Congonhas
+        return None
+    dep_at = t.get("departure_at") or ""
+    dep, ret = dep_at[:10], (t.get("return_at") or "")[:10]
+    dest_airport = t.get("destination_airport") or dest
+    transfers = t.get("transfers")
+    stops = ("direto" if transfers == 0 else f"{transfers} escala(s)") if transfers is not None else ""
+    row = {
+        "mode": "aviao", "origin": origin, "dest": dest, "dep_date": dep,
+        "dep_time": dep_at[11:16] or None, "price": float(t["price"]), "carrier": t.get("airline"),
+        "info": " · ".join(x for x in (f"saindo de {airport}", stops) if x),
+        "link": google_flights_link(airport, dest_airport, dep),
+    }
+    if round_trip:
+        if not ret:
+            return None
+        nights = (date.fromisoformat(ret) - date.fromisoformat(dep)).days
+        if not config.TRIP_MIN_NIGHTS <= nights <= config.TRIP_MAX_NIGHTS:
+            return None
+        q = quote(f"Flights from {airport} to {dest_airport} on {dep} returning {ret}")
+        row.update(mode="aviao_iv", ret_date=ret,
+                   link=f"https://www.google.com/travel/flights?q={q}&hl=pt-BR&curr=BRL")
+    return row
+
+
 def fetch():
     token = os.environ.get("TRAVELPAYOUTS_TOKEN", "").strip()
     if not token:
         print("[voos] TRAVELPAYOUTS_TOKEN ausente — pulando voos")
         return []
 
-    rows, errors = [], 0
-    for origin in config.FLIGHT_ORIGINS:
-        for month in _months_ahead(config.FLIGHT_MONTHS_AHEAD):
-            for page in (1, 2, 3):
-                try:
-                    data = _get({
-                        "origin": origin, "departure_at": month, "one_way": "true",
-                        "currency": "brl", "market": "br", "sorting": "price",
-                        "limit": 1000, "page": page,
-                    }, token)
-                except Exception as e:  # noqa: BLE001
-                    errors += 1
-                    print(f"[voos] {origin} {month} p{page}: {e}")
-                    break
-                for t in data:
-                    dest = (t.get("destination") or "").upper()
-                    if dest not in config.BR_DESTINATIONS or not t.get("price"):
-                        continue
-                    dep_at = t.get("departure_at") or ""
-                    dep = dep_at[:10]
-                    transfers = t.get("transfers")
-                    rows.append({
-                        "mode": "aviao", "origin": origin, "dest": dest, "dep_date": dep,
-                        "dep_time": dep_at[11:16] or None, "price": float(t["price"]),
-                        "carrier": t.get("airline"),
-                        "info": ("direto" if transfers == 0 else f"{transfers} escala(s)") if transfers is not None else None,
-                        "link": google_flights_link(t.get("origin_airport") or origin, t.get("destination_airport") or dest, dep),
-                    })
-                if len(data) < 1000:
-                    break
-    print(f"[voos] {len(rows)} preços nacionais coletados ({errors} erros)")
+    rows, errors, skipped = [], 0, 0
+    for one_way in ("true", "false"):            # só ida, depois ida e volta
+        for origin in config.FLIGHT_ORIGINS:
+            for month in _months_ahead(config.FLIGHT_MONTHS_AHEAD):
+                for page in (1, 2, 3):
+                    try:
+                        data = _get({
+                            "origin": origin, "departure_at": month, "one_way": one_way,
+                            "currency": "brl", "market": "br", "sorting": "price",
+                            "limit": 1000, "page": page,
+                        }, token)
+                    except Exception as e:  # noqa: BLE001
+                        errors += 1
+                        print(f"[voos] {origin} {month} p{page}: {e}")
+                        break
+                    for t in data:
+                        row = _row(t, origin, one_way == "false")
+                        if row:
+                            rows.append(row)
+                        else:
+                            skipped += 1
+                    if len(data) < 1000:
+                        break
+    n_rt = sum(r["mode"] == "aviao_iv" for r in rows)
+    print(f"[voos] {len(rows) - n_rt} só ida + {n_rt} ida e volta (GRU/CGH), "
+          f"{skipped} descartados, {errors} erros")
     if errors and not rows:
         raise RuntimeError("Nenhum preço de voo coletado — verificar token/API")
     return rows

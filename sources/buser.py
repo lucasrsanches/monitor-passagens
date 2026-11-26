@@ -23,12 +23,12 @@ def _plan(run_no):
     today = date.today()
     n_windows = -(-config.BUS_DAYS_AHEAD // WINDOW)
     jobs = []
-    for o, d, dest, prio in config.BUSER_ROUTES:
+    for o, d, city, prio, volta in config.BUSER_ROUTES:
         per_run = 2 if prio == 1 else 1
         for k in range(per_run):
             w = (run_no * per_run + k) % n_windows
             anchor = today + timedelta(days=3 + w * WINDOW)   # página mostra anchor-2 .. anchor+5
-            jobs.append((prio, o, d, dest, anchor.isoformat()))
+            jobs.append((prio, o, d, city, volta, anchor.isoformat()))
     jobs.sort(key=lambda j: j[0])
     return [j[1:] for j in jobs]
 
@@ -46,7 +46,7 @@ def fetch(db=None):
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(locale="pt-BR")
         page.route("**/*", lambda r: r.abort() if BLOCK.search(r.request.url) else r.continue_())
-        for o, d, dest, anchor in jobs:
+        for o, d, city, volta, anchor in jobs:
             if time.time() - t0 > config.BUSER_TIME_BUDGET_SECONDS:
                 print(f"[buser] tempo esgotado depois de {done} buscas")
                 break
@@ -64,9 +64,12 @@ def fetch(db=None):
                 for day in info.value.json().get("precos") or []:
                     if day.get("price") and day.get("date", "") > today:
                         rows.append({
-                            "mode": "onibus", "origin": ORIGIN_LABEL.get(o, o), "dest": dest,
+                            "mode": "onibus_volta" if volta else "onibus",
+                            "origin": city if volta else ORIGIN_LABEL.get(o, o),
+                            "dest": "SP/ABC" if volta else city,
                             "dep_date": day["date"], "price": float(day["price"]), "carrier": "Buser",
-                            "info": "menor preço do dia", "link": SEARCH.format(o=o, d=d, dt=day["date"]),
+                            "info": "menor preço do dia" + (f" · chega em {ORIGIN_LABEL.get(d, d)}" if volta else ""),
+                            "link": SEARCH.format(o=o, d=d, dt=day["date"]),
                         })
                         got += 1
                 if done <= 2:

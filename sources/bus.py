@@ -38,16 +38,17 @@ def _plan(run_no):
     """Quais (rota, data) consultar nesta execução. Prioridade 1 é olhada com mais frequência."""
     today = date.today()
     jobs = []
-    for route in config.BUS_ROUTES:
-        o_slug, d_slug, dest, prio = route
+    for o_slug, d_slug, city, prio, volta in config.BUS_ROUTES:
         every = config.BUS_EVERY_N_RUNS[prio]
         for i in range(1, config.BUS_DAYS_AHEAD + 1):
             if (i + run_no) % every == 0:
-                jobs.append((o_slug, d_slug, dest, (today + timedelta(days=i)).isoformat()))
-    return jobs
+                jobs.append((prio, i, o_slug, d_slug, city, volta, (today + timedelta(days=i)).isoformat()))
+    jobs.sort(key=lambda j: (j[0], j[1]))      # prioridade 1 primeiro, datas próximas primeiro
+    return [j[2:] for j in jobs]
 
 
-def _rows_from(payload, dest, dep, url):
+def _rows_from(payload, city, dep, url, volta=False):
+    """Menor preço por rodoviária de SP/ABC. Na volta, a rodoviária é a de chegada."""
     trips = [t for t in payload.get("trips") or [] if t.get("price")]
     if not trips:
         return []
@@ -55,10 +56,10 @@ def _rows_from(payload, dest, dep, url):
     best = {}
     for t in trips:
         h = _hours(t["duration"]["hours"])
-        if h > fastest * 1.5 + 1 or h > config.BUS_MAX_HOURS.get(dest, config.BUS_MAX_HOURS["*"]):
+        if h > fastest * 1.5 + 1 or h > config.BUS_MAX_HOURS.get(city, config.BUS_MAX_HOURS["*"]):
             continue   # descarta conexões absurdas (ex.: Santo André -> Peruíbe em 20h)
-        first = t["parts"][0]
-        term = _terminal(first["departure"]["name"])
+        end = t["parts"][-1]["arrival"] if volta else t["parts"][0]["departure"]
+        term = _terminal(end["name"])
         if not term:
             continue
         if term not in best or t["price"] < best[term]["price"]:
@@ -71,9 +72,12 @@ def _rows_from(payload, dest, dep, url):
             bits.append("com conexão")
         if t.get("originalPrice") and t["originalPrice"] > t["price"] + 0.5:
             bits.append(f"de R$ {t['originalPrice']:.0f}")
+        if volta:
+            bits.append(f"chega em {term}")
         rows.append({
-            "mode": "onibus", "origin": term, "dest": dest, "dep_date": dep,
-            "dep_time": first["departure"]["time"][:5], "price": float(t["price"]),
+            "mode": "onibus_volta" if volta else "onibus",
+            "origin": city if volta else term, "dest": "SP/ABC" if volta else city,
+            "dep_date": dep, "dep_time": first["departure"]["time"][:5], "price": float(t["price"]),
             "carrier": first["travelCompany"]["name"], "info": " · ".join(bits), "link": url,
         })
     return rows
@@ -92,7 +96,7 @@ def fetch(db=None):
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(locale="pt-BR")
         page.route("**/*", lambda r: r.abort() if BLOCK.search(r.request.url) else r.continue_())
-        for o_slug, d_slug, dest, dep in jobs:
+        for o_slug, d_slug, city, volta, dep in jobs:
             if time.time() - t0 > config.BUS_TIME_BUDGET_SECONDS:
                 print(f"[ônibus] tempo esgotado depois de {done} buscas")
                 break
@@ -107,7 +111,7 @@ def fetch(db=None):
                 status = info.value.status
                 if status == 429:
                     raise RuntimeError("429")
-                got = _rows_from(info.value.json(), dest, dep, url) if status == 200 else []
+                got = _rows_from(info.value.json(), city, dep, url, volta) if status == 200 else []
                 rows += got
                 if done <= 3 or status != 200:
                     print(f"[ônibus] {o_slug}->{d_slug} {dep}: HTTP {status}, {len(got)} preços, {time.time() - s0:.1f}s")
