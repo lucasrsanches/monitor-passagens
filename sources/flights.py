@@ -41,7 +41,7 @@ def _row(t, origin, round_trip):
     """Converte um item da API numa linha do histórico (ou None se não interessa)."""
     dest = (t.get("destination") or "").upper()
     airport = (t.get("origin_airport") or "").upper()
-    if dest not in config.BR_DESTINATIONS or not t.get("price"):
+    if dest not in config.FLIGHT_DESTINATIONS or not t.get("price"):
         return None
     if airport not in config.FLIGHT_AIRPORTS:      # só Guarulhos e Congonhas
         return None
@@ -78,7 +78,7 @@ def fetch():
     for one_way in ("true", "false"):            # só ida, depois ida e volta
         for origin in config.FLIGHT_ORIGINS:
             for month in _months_ahead(config.FLIGHT_MONTHS_AHEAD):
-                for page in (1, 2, 3):
+                for page in (1, 2, 3, 4, 5):   # mais páginas: agora entram internacionais
                     try:
                         data = _get({
                             "origin": origin, "departure_at": month, "one_way": one_way,
@@ -98,6 +98,9 @@ def fetch():
                     if len(data) < 1000:
                         break
     n_rt = sum(r["mode"] == "aviao_iv" for r in rows)
+    n_intl = sum(r["dest"] in config.INTL_DESTINATIONS for r in rows)
+    print(f"[voos] internacionais: {n_intl} preços, "
+          f"{len({r['dest'] for r in rows if r['dest'] in config.INTL_DESTINATIONS})} destinos")
     print(f"[voos] {len(rows) - n_rt} só ida + {n_rt} ida e volta (GRU/CGH), "
           f"{skipped} descartados, {errors} erros")
     if errors and not rows:
